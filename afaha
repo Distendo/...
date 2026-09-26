@@ -10,6 +10,30 @@ if not remoteEvent then
 	remoteEvent.Parent = ReplicatedStorage
 end
 
+local ufpEvent = ReplicatedStorage:FindFirstChild("fah-ufp")
+if not ufpEvent then
+	ufpEvent = Instance.new("UnreliableRemoteEvent")
+	ufpEvent.Name = "fah-ufp"
+	ufpEvent.Parent = ReplicatedStorage
+end
+
+local cartridgesFolder = ServerStorage:FindFirstChild("FAH_Cartridges")
+if not cartridgesFolder then
+	cartridgesFolder = Instance.new("Folder")
+	cartridgesFolder.Name = "FAH_Cartridges"
+	cartridgesFolder.Parent = ServerStorage
+end
+
+local function getPlayerCartridgeFolder(player)
+	local pFolder = cartridgesFolder:FindFirstChild(tostring(player.UserId))
+	if not pFolder then
+		pFolder = Instance.new("Folder")
+		pFolder.Name = tostring(player.UserId)
+		pFolder.Parent = cartridgesFolder
+	end
+	return pFolder
+end
+
 local function createFAHTool()
 	local tool = Instance.new("Tool")
 	tool.Name = "FAH Engine"
@@ -18,10 +42,11 @@ local function createFAHTool()
 
 	local handle = Instance.new("Part")
 	handle.Name = "Handle"
-	handle.Size = Vector3.new(2, 2, 2)
+	handle.Size = Vector3.new(0.6, 0.6, 0.6)
 	handle.Material = Enum.Material.SmoothPlastic
 	handle.Color = Color3.fromRGB(22, 22, 22)
 	handle.CastShadow = true
+	tool.GripPosition = Vector3.new(0, 0, 0)
 	handle.Parent = tool
 
 	local faces = {
@@ -34,6 +59,7 @@ local function createFAHTool()
 		local surfaceGui = Instance.new("SurfaceGui")
 		surfaceGui.Face = face
 		surfaceGui.AlwaysOnTop = false
+		surfaceGui.PixelsPerStud = 250
 		surfaceGui.Parent = handle
 
 		local textLabel = Instance.new("TextLabel")
@@ -42,7 +68,7 @@ local function createFAHTool()
 		textLabel.Text = "FAH"
 		textLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
 		textLabel.TextScaled = true
-		textLabel.Font = Enum.Font.Gotham
+		textLabel.Font = Enum.Font.GothamBold
 		textLabel.Parent = surfaceGui
 	end
 
@@ -52,9 +78,10 @@ local function createFAHTool()
 		local ReplicatedStorage = game:GetService("ReplicatedStorage")
 		local Players = game:GetService("Players")
 		local remote = ReplicatedStorage:WaitForChild("fah-eng")
+		local ufp = ReplicatedStorage:WaitForChild("fah-ufp")
 		local player = Players.LocalPlayer
 
-		local function showNotification()
+		local function showNotification(message, subtitle)
 			local playerGui = player:WaitForChild("PlayerGui", 5)
 			if not playerGui then return end
 
@@ -84,7 +111,7 @@ local function createFAHTool()
 			title.Size = UDim2.new(1, -15, 0, 24)
 			title.Position = UDim2.new(0, 12, 0, 8)
 			title.BackgroundTransparency = 1
-			title.Text = "FAH engine called."
+			title.Text = message or "FAH Engine called."
 			title.TextColor3 = Color3.fromRGB(240, 240, 240)
 			title.Font = Enum.Font.Gotham
 			title.TextSize = 13
@@ -95,7 +122,7 @@ local function createFAHTool()
 			credit.Size = UDim2.new(1, -15, 0, 18)
 			credit.Position = UDim2.new(0, 12, 0, 30)
 			credit.BackgroundTransparency = 1
-			credit.Text = "made by UU x Alkek"
+			credit.Text = subtitle or "made by UU x Alkek"
 			credit.TextColor3 = Color3.fromRGB(130, 130, 130)
 			credit.Font = Enum.Font.Gotham
 			credit.TextSize = 11
@@ -108,12 +135,35 @@ local function createFAHTool()
 		end
 
 		script.Parent.Equipped:Connect(function()
-			showNotification()
+			showNotification("FAH Engine Active", "made by UU x Alkek")
 		end)
-		showNotification()
+		showNotification("FAH Engine Ready", "made by UU x Alkek")
 
 		local fah = {}
 		fah.syncapi = {}
+		fah.ufp = {}
+
+		function fah.ufp.FastMove(parts, vector)
+			for _, part in ipairs(parts) do
+				if part and part:IsA("BasePart") then
+					part.CFrame = part.CFrame + vector
+				end
+			end
+			ufpEvent:FireServer("FastMove", {Parts = parts, Vector = vector})
+		end
+
+		function fah.ufp.FastRotate(parts, rotation)
+			for _, part in ipairs(parts) do
+				if part and part:IsA("BasePart") then
+					part.CFrame = part.CFrame * rotation
+				end
+			end
+			ufpEvent:FireServer("FastRotate", {Parts = parts, Rotation = rotation})
+		end
+
+		function fah.ufp.InstantSignal(action, data)
+			ufpEvent:FireServer(action, data)
+		end
 
 		function fah.syncapi.Create(className, parent, properties)
 			return remote:InvokeServer("Create", {ClassName = className, Parent = parent, Properties = properties})
@@ -147,6 +197,34 @@ local function createFAHTool()
 			return remote:InvokeServer("Weld", {Parts = parts})
 		end
 
+		function fah.syncapi.Unweld(parts)
+			return remote:InvokeServer("Unweld", {Parts = parts})
+		end
+
+		function fah.syncapi.Group(parts, modelName)
+			return remote:InvokeServer("Group", {Parts = parts, Name = modelName or "FAH_Model"})
+		end
+
+		function fah.syncapi.Anchor(parts, anchored)
+			return remote:InvokeServer("Anchor", {Parts = parts, Anchored = anchored})
+		end
+
+		function fah.syncapi.Color(parts, color3)
+			return remote:InvokeServer("Color", {Parts = parts, Color = color3})
+		end
+
+		function fah.syncapi.Material(parts, material)
+			return remote:InvokeServer("Material", {Parts = parts, Material = material})
+		end
+
+		function fah.syncapi.Transparency(parts, transparency)
+			return remote:InvokeServer("Transparency", {Parts = parts, Transparency = transparency})
+		end
+
+		function fah.syncapi.CanCollide(parts, canCollide)
+			return remote:InvokeServer("CanCollide", {Parts = parts, CanCollide = canCollide})
+		end
+
 		function fah.syncapi.PlayAudio(part, soundId, volume, pitch)
 			return remote:InvokeServer("PlayAudio", {Part = part, SoundId = soundId, Volume = volume or 1, Pitch = pitch or 1})
 		end
@@ -155,9 +233,43 @@ local function createFAHTool()
 			return remote:InvokeServer("SetPartScript", {Part = part, Code = codeString})
 		end
 
+		function fah.syncapi.SaveCartridge(slot, parts)
+			local res = remote:InvokeServer("SaveCartridge", {Slot = slot, Parts = parts})
+			if res then
+				showNotification("Cartridge #" .. tostring(slot) .. " Saved!", "Build stored successfully")
+			else
+				showNotification("Save Failed (Slot " .. tostring(slot) .. ")", "Check parts or slot limit (1-10)")
+			end
+			return res
+		end
+
+		function fah.syncapi.LoadCartridge(slot, position)
+			local res = remote:InvokeServer("LoadCartridge", {Slot = slot, Position = position})
+			if res then
+				showNotification("Cartridge #" .. tostring(slot) .. " Loaded!", "Build spawned in world")
+			else
+				showNotification("Load Failed (Slot " .. tostring(slot) .. ")", "Slot is empty or invalid")
+			end
+			return res
+		end
+
+		function fah.syncapi.DeleteCartridge(slot)
+			local res = remote:InvokeServer("DeleteCartridge", {Slot = slot})
+			if res then
+				showNotification("Cartridge #" .. tostring(slot) .. " Deleted", "Slot cleared")
+			else
+				showNotification("Delete Failed", "Slot already empty")
+			end
+			return res
+		end
+
+		function fah.syncapi.GetCartridgesInfo()
+			return remote:InvokeServer("GetCartridgesInfo", {})
+		end
+
 		getgenv = getgenv or function() return _G end
 		getgenv().fah = fah
-		print("[FAH Engine] Initialized successfully. made by UU x Alkek")
+		print("[FAH Engine v3.1 + UFP] Initialized successfully. Made by UU x Alkek")
 	]]
 	clientScript.Parent = tool
 
@@ -211,6 +323,22 @@ RunService.Heartbeat:Connect(function(dt)
 			end)
 		else
 			activePartScripts[part] = nil
+		end
+	end
+end)
+
+ufpEvent.OnServerEvent:Connect(function(player, action, data)
+	if action == "FastMove" and data then
+		for _, part in ipairs(data.Parts or {}) do
+			if part and part:IsA("BasePart") then
+				part.CFrame = part.CFrame + data.Vector
+			end
+		end
+	elseif action == "FastRotate" and data then
+		for _, part in ipairs(data.Parts or {}) do
+			if part and part:IsA("BasePart") then
+				part.CFrame = part.CFrame * data.Rotation
+			end
 		end
 	end
 end)
@@ -302,6 +430,73 @@ remoteEvent.OnServerEvent:Connect(function(player, action, data)
 		end
 		return true
 
+	elseif action == "Unweld" and data then
+		for _, part in ipairs(data.Parts or {}) do
+			if part and part:IsA("BasePart") then
+				for _, child in ipairs(part:GetChildren()) do
+					if child:IsA("WeldConstraint") or child:IsA("Weld") then
+						child:Destroy()
+					end
+				end
+			end
+		end
+		return true
+
+	elseif action == "Group" and data then
+		local parts = data.Parts
+		if parts and #parts > 0 then
+			local model = Instance.new("Model")
+			model.Name = data.Name or "FAH_Model"
+			model.Parent = workspace
+			for _, p in ipairs(parts) do
+				if p and p:IsA("Instance") then
+					p.Parent = model
+				end
+			end
+			return model
+		end
+		return nil
+
+	elseif action == "Anchor" and data then
+		for _, part in ipairs(data.Parts or {}) do
+			if part and part:IsA("BasePart") then
+				part.Anchored = data.Anchored
+			end
+		end
+		return true
+
+	elseif action == "Color" and data then
+		for _, part in ipairs(data.Parts or {}) do
+			if part and part:IsA("BasePart") then
+				part.Color = data.Color
+			end
+		end
+		return true
+
+	elseif action == "Material" and data then
+		for _, part in ipairs(data.Parts or {}) do
+			if part and part:IsA("BasePart") then
+				part.Material = data.Material
+			end
+		end
+		return true
+
+	elseif action == "Transparency" and data then
+		for _, part in ipairs(data.Parts or {}) do
+			if part and part:IsA("BasePart") then
+				part.Transparency = data.Transparency
+			end
+		end
+		return true
+
+	elseif action == "CanCollide" and data then
+		for _, part in ipairs(data.Parts or {}) do
+			if part and part:IsA("BasePart") then
+				part.CanCollide = data.CanCollide
+			end
+		end
+		return true
+
 	elseif action == "PlayAudio" and data then
 		local part = data.Part
 		if part and part:IsA("BasePart") then
@@ -319,6 +514,79 @@ remoteEvent.OnServerEvent:Connect(function(player, action, data)
 
 	elseif action == "SetPartScript" and data then
 		return registerPartScript(data.Part, data.Code)
+
+	elseif action == "SaveCartridge" and data then
+		local pFolder = getPlayerCartridgeFolder(player)
+		local slotNum = tonumber(data.Slot)
+		if not slotNum or slotNum < 1 or slotNum > 10 then return false end
+		
+		local existing = pFolder:FindFirstChild("Slot_" .. slotNum)
+		local children = pFolder:GetChildren()
+		if not existing and #children >= 10 then return false end
+		if existing then existing:Destroy() end
+
+		local model = Instance.new("Model")
+		model.Name = "Slot_" .. slotNum
+		
+		local parts = data.Parts
+		if not parts or #parts == 0 then return false end
+
+		for _, p in ipairs(parts) do
+			if p and p:IsA("BasePart") then
+				local clone = p:Clone()
+				clone.Parent = model
+			end
+		end
+		model.Parent = pFolder
+		return true
+
+	elseif action == "LoadCartridge" and data then
+		local pFolder = getPlayerCartridgeFolder(player)
+		local slotNum = tonumber(data.Slot)
+		if not slotNum or slotNum < 1 or slotNum > 10 then return nil end
+
+		local existing = pFolder:FindFirstChild("Slot_" .. slotNum)
+		if not existing then return nil end
+
+		local loadedModel = existing:Clone()
+		loadedModel.Parent = workspace
+
+		local targetPos = data.Position
+		if not targetPos and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			targetPos = player.Character.HumanoidRootPart.Position + Vector3.new(0, 0, 5)
+		end
+		targetPos = targetPos or Vector3.new(0, 5, 0)
+
+		local primary = loadedModel:FindFirstChildOfClass("BasePart")
+		if primary then
+			local offset = targetPos - primary.Position
+			for _, child in ipairs(loadedModel:GetChildren()) do
+				if child:IsA("BasePart") then
+					child.CFrame = child.CFrame + offset
+				end
+			end
+		end
+		return loadedModel
+
+	elseif action == "DeleteCartridge" and data then
+		local pFolder = getPlayerCartridgeFolder(player)
+		local slotNum = tonumber(data.Slot)
+		if not slotNum or slotNum < 1 or slotNum > 10 then return false end
+
+		local existing = pFolder:FindFirstChild("Slot_" .. slotNum)
+		if existing then
+			existing:Destroy()
+			return true
+		end
+		return false
+
+	elseif action == "GetCartridgesInfo" then
+		local pFolder = getPlayerCartridgeFolder(player)
+		local info = {}
+		for i = 1, 10 do
+			info[i] = pFolder:FindFirstChild("Slot_" .. i) ~= nil
+		end
+		return info
 	end
 end)
 

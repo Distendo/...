@@ -1,0 +1,330 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local remoteEvent = ReplicatedStorage:FindFirstChild("fah-eng")
+if not remoteEvent then
+	remoteEvent = Instance.new("RemoteEvent")
+	remoteEvent.Name = "fah-eng"
+	remoteEvent.Parent = ReplicatedStorage
+end
+
+local function createFAHTool()
+	local tool = Instance.new("Tool")
+	tool.Name = "FAH Engine"
+	tool.RequiresHandle = true
+	tool.CanBeDropped = true
+
+	local handle = Instance.new("Part")
+	handle.Name = "Handle"
+	handle.Size = Vector3.new(2, 2, 2)
+	handle.Material = Enum.Material.SmoothPlastic
+	handle.Color = Color3.fromRGB(22, 22, 22)
+	handle.CastShadow = true
+	handle.Parent = tool
+
+	local faces = {
+		Enum.NormalId.Front, Enum.NormalId.Back,
+		Enum.NormalId.Top, Enum.NormalId.Bottom,
+		Enum.NormalId.Left, Enum.NormalId.Right
+	}
+
+	for _, face in ipairs(faces) do
+		local surfaceGui = Instance.new("SurfaceGui")
+		surfaceGui.Face = face
+		surfaceGui.AlwaysOnTop = false
+		surfaceGui.Parent = handle
+
+		local textLabel = Instance.new("TextLabel")
+		textLabel.Size = UDim2.new(1, 0, 1, 0)
+		textLabel.BackgroundTransparency = 1
+		textLabel.Text = "FAH"
+		textLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
+		textLabel.TextScaled = true
+		textLabel.Font = Enum.Font.Gotham
+		textLabel.Parent = surfaceGui
+	end
+
+	local clientScript = Instance.new("LocalScript")
+	clientScript.Name = "FAHClientBootstrap"
+	clientScript.Source = [[
+		local ReplicatedStorage = game:GetService("ReplicatedStorage")
+		local Players = game:GetService("Players")
+		local remote = ReplicatedStorage:WaitForChild("fah-eng")
+		local player = Players.LocalPlayer
+
+		local function showNotification()
+			local playerGui = player:WaitForChild("PlayerGui", 5)
+			if not playerGui then return end
+
+			if playerGui:FindFirstChild("FAHNotification") then
+				playerGui.FAHNotification:Destroy()
+			end
+
+			local screenGui = Instance.new("ScreenGui")
+			screenGui.Name = "FAHNotification"
+			screenGui.ResetOnSpawn = false
+			screenGui.Parent = playerGui
+
+			local frame = Instance.new("Frame")
+			frame.Size = UDim2.new(0, 240, 0, 56)
+			frame.Position = UDim2.new(1, -260, 1, -76)
+			frame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+			frame.BorderSizePixel = 0
+			frame.Parent = screenGui
+
+			local accent = Instance.new("Frame")
+			accent.Size = UDim2.new(0, 3, 1, 0)
+			accent.BackgroundColor3 = Color3.fromRGB(90, 140, 255)
+			accent.BorderSizePixel = 0
+			accent.Parent = frame
+
+			local title = Instance.new("TextLabel")
+			title.Size = UDim2.new(1, -15, 0, 24)
+			title.Position = UDim2.new(0, 12, 0, 8)
+			title.BackgroundTransparency = 1
+			title.Text = "FAH engine called."
+			title.TextColor3 = Color3.fromRGB(240, 240, 240)
+			title.Font = Enum.Font.Gotham
+			title.TextSize = 13
+			title.TextXAlignment = Enum.TextXAlignment.Left
+			title.Parent = frame
+
+			local credit = Instance.new("TextLabel")
+			credit.Size = UDim2.new(1, -15, 0, 18)
+			credit.Position = UDim2.new(0, 12, 0, 30)
+			credit.BackgroundTransparency = 1
+			credit.Text = "made by UU x Alkek"
+			credit.TextColor3 = Color3.fromRGB(130, 130, 130)
+			credit.Font = Enum.Font.Gotham
+			credit.TextSize = 11
+			credit.TextXAlignment = Enum.TextXAlignment.Left
+			credit.Parent = frame
+
+			task.delay(4, function()
+				if screenGui then screenGui:Destroy() end
+			end)
+		end
+
+		script.Parent.Equipped:Connect(function()
+			showNotification()
+		end)
+		showNotification()
+
+		local fah = {}
+		fah.syncapi = {}
+
+		function fah.syncapi.Create(className, parent, properties)
+			return remote:InvokeServer("Create", {ClassName = className, Parent = parent, Properties = properties})
+		end
+
+		function fah.syncapi.SetProperties(parts, properties)
+			return remote:InvokeServer("SetProperties", {Parts = parts, Properties = properties})
+		end
+
+		function fah.syncapi.Move(parts, vector)
+			return remote:InvokeServer("Move", {Parts = parts, Vector = vector})
+		end
+
+		function fah.syncapi.Scale(parts, sizeVector)
+			return remote:InvokeServer("Scale", {Parts = parts, SizeVector = sizeVector})
+		end
+
+		function fah.syncapi.Rotate(parts, cframeRot)
+			return remote:InvokeServer("Rotate", {Parts = parts, Rotation = cframeRot})
+		end
+
+		function fah.syncapi.Delete(parts)
+			return remote:InvokeServer("Delete", {Parts = parts})
+		end
+
+		function fah.syncapi.Clone(parts)
+			return remote:InvokeServer("Clone", {Parts = parts})
+		end
+
+		function fah.syncapi.Weld(parts)
+			return remote:InvokeServer("Weld", {Parts = parts})
+		end
+
+		function fah.syncapi.PlayAudio(part, soundId, volume, pitch)
+			return remote:InvokeServer("PlayAudio", {Part = part, SoundId = soundId, Volume = volume or 1, Pitch = pitch or 1})
+		end
+
+		function fah.syncapi.SetPartScript(part, codeString)
+			return remote:InvokeServer("SetPartScript", {Part = part, Code = codeString})
+		end
+
+		getgenv = getgenv or function() return _G end
+		getgenv().fah = fah
+		print("[FAH Engine] Initialized successfully. made by UU x Alkek")
+	]]
+	clientScript.Parent = tool
+
+	return tool
+end
+
+local toolTemplate = createFAHTool()
+toolTemplate.Parent = ServerStorage
+
+local function giveToolToPlayer(player)
+	local backpack = player:FindFirstChild("Backpack")
+	if backpack and not backpack:FindFirstChild("FAH Engine") then
+		local clone = toolTemplate:Clone()
+		clone.Parent = backpack
+	end
+end
+
+local activePartScripts = {}
+
+local function registerPartScript(part, code)
+	if not part or not part:IsA("BasePart") then return false end
+	if type(code) ~= "string" or #code > 400 then return false end
+
+	local chunk, err = loadstring("local part = script.Parent\n" .. code)
+	if not chunk then return false end
+
+	local env = {
+		part = part,
+		script = { Parent = part },
+		math = math,
+		Vector3 = Vector3,
+		CFrame = CFrame,
+		Color3 = Color3,
+		tick = tick,
+		time = time
+	}
+	setfenv(chunk, env)
+
+	activePartScripts[part] = {
+		Func = chunk,
+		LastRun = 0
+	}
+	return true
+end
+
+RunService.Heartbeat:Connect(function(dt)
+	for part, data in pairs(activePartScripts) do
+		if part and part.Parent then
+			pcall(function()
+				data.Func()
+			end)
+		else
+			activePartScripts[part] = nil
+		end
+	end
+end)
+
+remoteEvent.OnServerEvent:Connect(function(player, action, data)
+	if action == "GiveTool" or action == nil then
+		giveToolToPlayer(player)
+		return
+	end
+
+	if action == "Create" and data then
+		local success, newInst = pcall(function()
+			local inst = Instance.new(data.ClassName)
+			for prop, val in pairs(data.Properties or {}) do
+				pcall(function() inst[prop] = val end)
+			end
+			inst.Parent = data.Parent or workspace
+			return inst
+		end)
+		return success and newInst or nil
+
+	elseif action == "SetProperties" and data then
+		for _, part in ipairs(data.Parts or {}) do
+			if part and part:IsA("Instance") then
+				for prop, val in pairs(data.Properties or {}) do
+					pcall(function() part[prop] = val end)
+				end
+			end
+		end
+		return true
+
+	elseif action == "Move" and data then
+		for _, part in ipairs(data.Parts or {}) do
+			if part and part:IsA("BasePart") then
+				part.CFrame = part.CFrame + data.Vector
+			end
+		end
+		return true
+
+	elseif action == "Scale" and data then
+		for _, part in ipairs(data.Parts or {}) do
+			if part and part:IsA("BasePart") then
+				part.Size = data.SizeVector
+			end
+		end
+		return true
+
+	elseif action == "Rotate" and data then
+		for _, part in ipairs(data.Parts or {}) do
+			if part and part:IsA("BasePart") then
+				part.CFrame = part.CFrame * data.Rotation
+			end
+		end
+		return true
+
+	elseif action == "Delete" and data then
+		for _, part in ipairs(data.Parts or {}) do
+			if part and part:IsA("Instance") then
+				activePartScripts[part] = nil
+				pcall(function() part:Destroy() end)
+			end
+		end
+		return true
+
+	elseif action == "Clone" and data then
+		local cloned = {}
+		for _, part in ipairs(data.Parts or {}) do
+			if part and part:IsA("Instance") then
+				local c = part:Clone()
+				c.Parent = part.Parent
+				table.insert(cloned, c)
+			end
+		end
+		return cloned
+
+	elseif action == "Weld" and data then
+		local parts = data.Parts
+		if parts and #parts >= 2 then
+			local primary = parts[1]
+			for i = 2, #parts do
+				local p = parts[i]
+				if p:IsA("BasePart") and primary:IsA("BasePart") then
+					local weld = Instance.new("WeldConstraint")
+					weld.Part0 = primary
+					weld.Part1 = p
+					weld.Parent = primary
+				end
+			end
+		end
+		return true
+
+	elseif action == "PlayAudio" and data then
+		local part = data.Part
+		if part and part:IsA("BasePart") then
+			local sound = Instance.new("Sound")
+			sound.SoundId = data.SoundId or ""
+			sound.Volume = data.Volume or 1
+			sound.PlaybackSpeed = data.Pitch or 1
+			sound.Parent = part
+			sound:Play()
+			sound.Ended:Connect(function()
+				sound:Destroy()
+			end)
+		end
+		return true
+
+	elseif action == "SetPartScript" and data then
+		return registerPartScript(data.Part, data.Code)
+	end
+end)
+
+Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(function()
+		task.wait(1)
+		giveToolToPlayer(player)
+	end)
+end)
